@@ -1,0 +1,15 @@
+{
+  "name": "github-report",
+  "version": "1.0.0",
+  "description": "",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@slack/client": "^3.12.0",
+    "github-api": "^3.0.0"
+  }
+}
