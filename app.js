@@ -13,14 +13,12 @@ function postToSlack(message, opts) {
     }
 }
 
-gh.getIssues('EC-CUBE', 'ec-cube').listIssues({"milestone":"none", "state":"open"}).then(function(data) {
-    if (data.data) {
-        let issueUrls = data.data.map(function(issue) {
-            return issue.html_url
-        });
+gh.getIssues('EC-CUBE', 'ec-cube').listIssues({"milestone":"none", "state":"open"}).then(data => {
+    if (data.data.length) {
+        let issueUrls = data.data.map(issue => issue.html_url);
         postToSlack(issueUrls.join('\n'), {username:'本日のNo Milestone'});
     }
-}).catch(function(e) {
+}).catch(e => {
     console.log(e);
     process.exit(1);
 });
