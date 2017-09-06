@@ -10,6 +10,7 @@
   "license": "MIT",
   "dependencies": {
     "@slack/client": "^3.12.0",
+    "co": "^4.6.0",
     "github-api": "^3.0.0"
   }
 }
