@@ -12,7 +12,10 @@ co(function*() {
     if (data.data.length) {
         let attachements = data.data.map(issue => {
             return {
-                text: `<${issue.html_url}|#${issue.number}> ${issue.title}`
+                text: `<${issue.html_url}|#${issue.number}> ${issue.title}`,
+                author_name: issue.user.login,
+                author_link: issue.user.html_url,
+                author_icon: issue.user.avatar_url
             }
         })
         if (SLACK_API_TOKEN) {
