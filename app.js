@@ -20,7 +20,7 @@ co(function*() {
         })
         if (SLACK_API_TOKEN) {
             let web = new SlackClient(SLACK_API_TOKEN);
-            yield web.chat.postMessage(SLACK_CHANNEL, null, {username:'本日のNo Milestone',attachments:attachements});
+            yield web.chat.postMessage(SLACK_CHANNEL, null, {'username':'本日のNo Milestone',attachments:attachements, 'icon_emoji':':ishi-cube:'});
         }
     }
 }).catch(e => {
