@@ -8,19 +8,24 @@ const gh = new GitHub({'token': GITHUB_TOKEN});
 const co = require('co');
 
 co(function*() {
-    let data = yield gh.getIssues('EC-CUBE', 'ec-cube').listIssues({"milestone":"none", "state":"open"});
-    if (data.data.length) {
-        let attachements = data.data.map(issue => {
-            return {
-                text: `<${issue.html_url}|#${issue.number}> ${issue.title}`,
-                author_name: issue.user.login,
-                author_link: issue.user.html_url,
-                author_icon: issue.user.avatar_url
+    let org = gh.getOrganization('EC-CUBE')
+    let repos = yield org._requestAllPages(`/orgs/EC-CUBE/repos`, {direction: 'desc', type:'public'});
+
+    for (let repo of repos.data) {
+        let data = yield gh.getIssues('EC-CUBE', repo.name).listIssues({"milestone":"none", "state":"open"});
+        if (data.data.length) {
+            let attachements = data.data.map(issue => {
+                return {
+                    text: `<${issue.html_url}|#${issue.number}> ${issue.title}`,
+                    author_name: issue.user.login,
+                    author_link: issue.user.html_url,
+                    author_icon: issue.user.avatar_url
+                }
+            })
+            if (SLACK_API_TOKEN) {
+                let web = new SlackClient(SLACK_API_TOKEN);
+                yield web.chat.postMessage(SLACK_CHANNEL, null, {'username':`[${repo.name}] 本日のNo Milestone`,attachments:attachements, 'icon_emoji':':ishi-cube:'});
             }
-        })
-        if (SLACK_API_TOKEN) {
-            let web = new SlackClient(SLACK_API_TOKEN);
-            yield web.chat.postMessage(SLACK_CHANNEL, null, {'username':'本日のNo Milestone',attachments:attachements, 'icon_emoji':':ishi-cube:'});
         }
     }
 }).catch(e => {
