@@ -6,49 +6,21 @@ const GitHub = require('github-api');
 const SlackClient = require('@slack/client').WebClient;
 const gh = new GitHub({'token': GITHUB_TOKEN});
 const co = require('co');
-const slack = new SlackClient(SLACK_API_TOKEN);
 
 co(function*() {
     let org = gh.getOrganization('EC-CUBE')
-
+    let dateStart = new Date(2017, 9, 1);
     let repos = yield org._requestAllPages(`/orgs/EC-CUBE/repos`, {direction: 'desc', type:'public'});
+    console.log(`|Repository|Base|PR|Date|Title|User|`)
+    console.log(`|---|---|---|---|---|---|`)
     for (let repo of repos.data) {
-
-        let issues = yield gh.getIssues('EC-CUBE', repo.name).listIssues({"state":"open"});
-
-        // fixme/disscussionラベルを取得
-        let labels = yield org._requestAllPages(`/repos/EC-CUBE/${repo.name}/labels`);
-        let ignoreLabelIds = labels.data.filter(label => label.name.match(/fix-me|discussion/i)).map(label => label.id);
-
-        if (issues.data.length) {
-            let attachments = issues.data.map(issue => {
-                let labels = [];
-
-                if (issue.milestone == null) {
-                    labels.push('マイルストーンなし');
+        let prs = yield gh.getRepo('EC-CUBE', repo.name).listPullRequests({'state':'closed', 'sort': 'updated', 'direction':'desc', 'per_page':100})
+        for (let pr of prs.data) {
+            if (pr.merged_at) {
+                let merged_at = new Date(pr.merged_at)
+                if (merged_at > dateStart) {
+                    console.log(`|${repo.name}|${pr.base.ref}|[#${pr.number}](${pr.html_url})|${merged_at.getFullYear()}-${merged_at.getMonth()+1}-${merged_at.getDate()}|${pr.title}|${pr.user.login}|`)
                 }
-
-                // Pull Requestでfixme/disscussionがなければマージ待ち
-                if (issue.pull_request && issue.labels.filter(label => ignoreLabelIds.indexOf(label.id) >= 0).length == 0) {
-                    labels.push('マージ待ち');
-                }
-
-                return labels.length ? {
-                    text: `<${issue.html_url}|#${issue.number}> ${issue.title}`,
-                    author_name: issue.user.login,
-                    author_link: issue.user.html_url,
-                    author_icon: issue.user.avatar_url,
-                    fields: [
-                        {
-                            title: labels.join(' ')
-                        }
-                    ]
-                } : null;
-
-            }).filter(issue => issue);
-
-            if (attachments.length) {
-                yield slack.chat.postMessage(SLACK_CHANNEL, null, {'username':`本日の${repo.name}`, attachments:attachments, 'icon_emoji':':ishi-cube:'});
             }
         }
     }
