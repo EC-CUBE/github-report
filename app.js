@@ -7,12 +7,17 @@ const SlackClient = require('@slack/client').WebClient;
 const gh = new GitHub({'token': GITHUB_TOKEN});
 const co = require('co');
 const slack = new SlackClient(SLACK_API_TOKEN);
+const IGNORE_REPOS = ['Eccube-Styleguide', 'Eccube-Styleguide-Admin'];
 
 co(function*() {
     let org = gh.getOrganization('EC-CUBE')
 
     let repos = yield org._requestAllPages(`/orgs/EC-CUBE/repos`, {direction: 'desc', type:'public'});
+    repos.data = repos.data.filter(repo => IGNORE_REPOS.indexOf(repo.name) < 0);
+
     for (let repo of repos.data) {
+
+        console.log(repo.name);
 
         let issues = yield gh.getIssues('EC-CUBE', repo.name).listIssues({"state":"open"});
 
