@@ -1,55 +1,56 @@
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
-const SLACK_API_TOKEN = process.env.SLACK_API_TOKEN;
-const SLACK_CHANNEL = process.env.SLACK_CHANNEL;
 
 const GitHub = require('github-api');
-const SlackClient = require('@slack/client').WebClient;
 const gh = new GitHub({'token': GITHUB_TOKEN});
 const co = require('co');
-const slack = new SlackClient(SLACK_API_TOKEN);
 
 co(function*() {
-    let org = gh.getOrganization('EC-CUBE')
 
+    console.log(`Repository\tMilestone\tLabel\tPR count`)
+
+    let org = gh.getOrganization('EC-CUBE')
     let repos = yield org._requestAllPages(`/orgs/EC-CUBE/repos`, {direction: 'desc', type:'public'});
+
     for (let repo of repos.data) {
 
-        let issues = yield gh.getIssues('EC-CUBE', repo.name).listIssues({"state":"open"});
+        let issueWrapper = gh.getIssues('EC-CUBE', repo.name);
+        let milestones = yield issueWrapper.listMilestones()
 
-        // fixme/disscussionラベルを取得
+        /*
+         * マイルストーンごとのPR数
+         */
+
+        let prs = yield gh.getRepo('EC-CUBE', repo.name).listPullRequests()
+        let prCountEachMilestone = prs.data.reduce((prev, current) => {
+            prev.set(current.milestone.title, prev.get(current.milestone.title) + 1);
+            return prev;
+        }, milestones.data.reduce((p, c) => { p.set(c.title, 0); return p }, new Map()))
+
+        prCountEachMilestone.forEach((v, k) => console.log(`${repo.name}\t${k}\t\t${v}`))
+
+        /*
+         * マイルストーンごとのfixme/discussionラベルのPR数
+         */
         let labels = yield org._requestAllPages(`/repos/EC-CUBE/${repo.name}/labels`);
-        let ignoreLabelIds = labels.data.filter(label => label.name.match(/fix-me|discussion/i)).map(label => label.id);
+        let targetLabels = labels.data.filter(label => label.name.match(/fix-me|discussion/i));
 
-        if (issues.data.length) {
-            let attachments = issues.data.map(issue => {
-                let labels = [];
-
-                if (issue.milestone == null) {
-                    labels.push('マイルストーンなし');
+        for (let milestone of milestones.data) {
+            let openIssuesCount = 0;
+            if (targetLabels.length) {
+                // ラベルごとのPR数
+                for (let label of targetLabels) {
+                    let labledIessues = yield issueWrapper.listIssues({'milestone':milestone.number, labels:label.name});
+                    let labledPRs = labledIessues.data.filter(issue => issue.pull_request)
+                    openIssuesCount += labledPRs.length;
                 }
-
-                // Pull Requestでfixme/disscussionがなければマージ待ち
-                if (issue.pull_request && issue.labels.filter(label => ignoreLabelIds.indexOf(label.id) >= 0).length == 0) {
-                    labels.push('マージ待ち');
+                // 重複分を排除
+                if (targetLabels.length >=2) {
+                    let allLabledIessues = yield issueWrapper.listIssues({'milestone':milestone.number, labels:targetLabels.map(label => label.name).join(',')});
+                    let allLabledPRs = allLabledIessues.data.filter(issue => issue.pull_request)
+                    openIssuesCount -= allLabledPRs.length;
                 }
-
-                return labels.length ? {
-                    text: `<${issue.html_url}|#${issue.number}> ${issue.title}`,
-                    author_name: issue.user.login,
-                    author_link: issue.user.html_url,
-                    author_icon: issue.user.avatar_url,
-                    fields: [
-                        {
-                            title: labels.join(' ')
-                        }
-                    ]
-                } : null;
-
-            }).filter(issue => issue);
-
-            if (attachments.length) {
-                yield slack.chat.postMessage(SLACK_CHANNEL, null, {'username':`本日の${repo.name}`, attachments:attachments, 'icon_emoji':':ishi-cube:'});
             }
+            console.log(`${repo.name}\t${milestone.title}\tfixme/disscussion\t${openIssuesCount}`)
         }
     }
 
