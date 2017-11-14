@@ -9,6 +9,21 @@ const co = require('co');
 const slack = new SlackClient(SLACK_API_TOKEN);
 const IGNORE_REPOS = ['Eccube-Styleguide', 'Eccube-Styleguide-Admin'];
 
+function hasMilestone(issue) {
+    return issue.milestone != null;
+}
+
+/**
+ * マージ待ちかどうかの判定
+ * @param issue ISSUE
+ * @param fixMeOrDiscussLabelIds fix-me/discussionラベルのIDリスト
+ */
+function isWaitForMerge(issue, fixMeOrDiscussLabelIds) {
+    return issue.pull_request
+        && issue.labels.filter(label => fixMeOrDiscussLabelIds.indexOf(label.id) >= 0).length == 0
+        && !issue.title.match(/\[WIP\]/);
+}
+
 co(function*() {
     let org = gh.getOrganization('EC-CUBE')
 
@@ -23,18 +38,17 @@ co(function*() {
 
         // fixme/disscussionラベルを取得
         let labels = yield org._requestAllPages(`/repos/EC-CUBE/${repo.name}/labels`);
-        let ignoreLabelIds = labels.data.filter(label => label.name.match(/fix-me|discussion/i)).map(label => label.id);
+        let fixMeOrDiscussLabelIds = labels.data.filter(label => label.name.match(/fix-me|discussion/i)).map(label => label.id);
 
         if (issues.data.length) {
             let attachments = issues.data.map(issue => {
                 let labels = [];
 
-                if (issue.milestone == null) {
+                if (!hasMilestone(issue)) {
                     labels.push('マイルストーンなし');
                 }
 
-                // Pull Requestでfixme/disscussionがなければマージ待ち
-                if (issue.pull_request && issue.labels.filter(label => ignoreLabelIds.indexOf(label.id) >= 0).length == 0) {
+                if (isWaitForMerge(issue, fixMeOrDiscussLabelIds)) {
                     labels.push('マージ待ち');
                 }
 
