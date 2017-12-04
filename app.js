@@ -25,7 +25,9 @@ function isWaitForMerge(issue, fixMeOrDiscussLabelIds) {
 }
 
 co(function*() {
-    let org = gh.getOrganization('EC-CUBE')
+
+    let yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    let org = gh.getOrganization('EC-CUBE');
 
     let repos = yield org._requestAllPages(`/orgs/EC-CUBE/repos`, {direction: 'desc', type:'public'});
     repos.data = repos.data.filter(repo => IGNORE_REPOS.indexOf(repo.name) < 0);
@@ -40,19 +42,23 @@ co(function*() {
         let labels = yield org._requestAllPages(`/repos/EC-CUBE/${repo.name}/labels`);
         let fixMeOrDiscussLabelIds = labels.data.filter(label => label.name.match(/fix-me|discussion/i)).map(label => label.id);
 
+        let nomilestonesCount = 0;
+        let waitForMergeCount = 0;
         if (issues.data.length) {
             let attachments = issues.data.map(issue => {
                 let labels = [];
 
                 if (!hasMilestone(issue)) {
+                    nomilestonesCount++;
                     labels.push('マイルストーンなし');
                 }
 
                 if (isWaitForMerge(issue, fixMeOrDiscussLabelIds)) {
+                    waitForMergeCount++;
                     labels.push('マージ待ち');
                 }
 
-                return labels.length ? {
+                return labels.length && yesterday < new Date(issue.created_at) ? {
                     text: `<${issue.html_url}|#${issue.number}> ${issue.title}`,
                     author_name: issue.user.login,
                     author_link: issue.user.html_url,
@@ -66,8 +72,12 @@ co(function*() {
 
             }).filter(issue => issue);
 
-            if (attachments.length) {
-                yield slack.chat.postMessage(SLACK_CHANNEL, null, {'username':`本日の${repo.name}`, attachments:attachments, 'icon_emoji':':ishi-cube:'});
+            if (nomilestonesCount || waitForMergeCount || attachments.length) {
+                let text = '';
+                if (nomilestonesCount) text += `マイルストーンなし ${nomilestonesCount}件\n`;
+                if (waitForMergeCount) text += `マージ待ち ${waitForMergeCount}件\n`;
+                if (attachments.length) text += `新規Issue/PR ${attachments.length}件\n`;
+                yield slack.chat.postMessage(SLACK_CHANNEL, text, {'username':`本日の${repo.name}`, attachments:attachments, 'icon_emoji':':ishi-cube:'});
             }
         }
     }
