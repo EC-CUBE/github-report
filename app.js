@@ -6,10 +6,12 @@ const GitHub = require('github-api');
 const SlackClient = require('@slack/client').WebClient;
 const gh = new GitHub({'token': GITHUB_TOKEN});
 const co = require('co');
+const START_DATE = process.env.START_DATE || new Date(new Date().setDate(-31)).toISOString();
 
 co(function*() {
     let org = gh.getOrganization('EC-CUBE')
-    let dateStart = new Date(2017, 9, 1);
+    let startDate = new Date(START_DATE);
+    console.log(`FROM: ${startDate}`);
     let repos = yield org._requestAllPages(`/orgs/EC-CUBE/repos`, {direction: 'desc', type:'public'});
     console.log(`|Repository|Base|PR|Date|Title|User|`)
     console.log(`|---|---|---|---|---|---|`)
@@ -18,7 +20,7 @@ co(function*() {
         for (let pr of prs.data) {
             if (pr.merged_at) {
                 let merged_at = new Date(pr.merged_at)
-                if (merged_at > dateStart) {
+                if (merged_at > startDate) {
                     console.log(`|${repo.name}|${pr.base.ref}|[#${pr.number}](${pr.html_url})|${merged_at.getFullYear()}-${merged_at.getMonth()+1}-${merged_at.getDate()}|${pr.title}|${pr.user.login}|`)
                 }
             }
