@@ -1,6 +1,4 @@
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
-const SLACK_API_TOKEN = process.env.SLACK_API_TOKEN;
-const SLACK_CHANNEL = process.env.SLACK_CHANNEL;
 
 const GitHub = require('github-api');
 const SlackClient = require('@slack/client').WebClient;

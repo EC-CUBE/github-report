@@ -1,0 +1,30 @@
+name: List pull requests
+
+on:
+  workflow_dispatch:
+    inputs:
+      start_date:
+        description: 'Start date (yyyy/MM/dd)'
+        # Default value if no value is explicitly provided
+        default: ''
+        # Input has to be provided for the workflow to run
+        required: true
+        # The data type of the input
+        type: string
+
+jobs:
+  list:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@master
+
+    - name: Setup npm
+      run: npm install
+
+    - name: Run script
+      env:
+        START_DATE: ${{ inputs.start_date }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: node app.js
